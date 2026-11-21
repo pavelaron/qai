@@ -1,0 +1,6 @@
+numpy==2.4.6
+qiskit==2.6.2
+qiskit_aer==0.18.4
+Requests==2.34.2
+scikit_learn==1.9.1
+sentence_transformers==6.3.0
