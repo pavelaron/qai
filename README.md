@@ -46,11 +46,31 @@ There is no config file or environment-variable layer.
 
 ## How it works
 
-1. Embed the documents and the question with `SentenceTransformer("all-MiniLM-L6-v2")`.
-2. Reduce the 384-dimensional embeddings to 4 dimensions with PCA (one dimension per qubit).
-3. For each document, encode the query and document vectors on a Qiskit circuit and estimate their similarity with a multi-qubit SWAP test on `AerSimulator` (2048 shots).
-4. Sort the documents by that score and keep the top two as context.
-5. POST a prompt to Ollama asking it to answer the question using only that context.
+• Classical feature compression: Because quantum simulators handle only a few qubits efficiently, you first compress text into tiny 2D or 4D numerical vectors (for example, using TF-IDF or a small embedding model reduced via PCA).
+• Quantum state encoding: Each normalized vector is mapped onto qubit rotation angles (such as \(R_y(\theta)\) gates) so the quantum state represents the direction of the text vector.
+• SWAP test circuit: A circuit uses an ancillary qubit, a Hadamard gate, and a controlled-SWAP (Fredkin) gate to compare the query state against a document state.
+• Similarity measurement: Measuring the ancillary qubit gives a probability \(P(0) = \frac{1}{2} + \frac{1}{2}\vert{}\langle \psi_{\text{query}} \vert{} \psi_{\text{doc}} \rangle\vert{}^2\). Higher probability of measuring 0 means the two texts are more similar.
+
+
+## Connecting It to an LLM
+
+• Retrieve: Run the quantum similarity loop over your small document set and pick the top-1 or top-2 document strings.
+• Generate: Pass those winning text strings into a standard LLM prompt (via Ollama, OpenAI, or Hugging Face) as context so the model can answer your question.
+
+
+## How the End-to-End Flow Works
+
+• Quantum ranking: The Qiskit circuit evaluates the inner product between your query vector and each document vector, returning similarity scores between 0 and 1.
+• Context injection: Python formats the highest-scoring text chunks into a strict system prompt so the local model relies on your retrieved facts rather than guessing.
+• Local inference: The requests.post call sends that prompt to Ollama's local REST endpoint on port 11434, and your local GPU or CPU generates the final answer offline.
+
+
+## Key Pipeline Details
+
+• PCA compression: Since all-MiniLM-L6-v2 outputs 384 numbers, PCA(n_components=4) keeps the 4 strongest semantic axes so the circuit needs only 9 total qubits (1 ancilla + 4 query + 4 document).
+• Multi-qubit SWAP test: Applying cswap across each pair of query and document qubits computes the combined inner product across all 4 dimensions at once.
+• Scaling note: You can increase n_qubits to 6 or 8 for better semantic accuracy while still running fast on AerSimulator.
+
 
 ## Troubleshooting
 
